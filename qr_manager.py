@@ -107,40 +107,32 @@ class QRCodeManager:
         
         return count
     
-    def generate_qr_code(self, label: str, index: int) -> bool:
+    def generate_qr_code(self, label: str, index: int, silent: bool = False) -> bool:
         """
         Generate QR code untuk satu orang
         
         Args:
             label: Label dari database (NamaOrtu_NamaAnak_Kelas)
             index: Index di database
+            silent: Jika True, tidak print message
         
         Returns:
             True jika berhasil
         """
         try:
-            # Generate unique ID
-            unique_id = self._generate_id(label, index)
+            # SIMPLIFIED: Hanya simpan index (lebih kecil, lebih mudah di-scan)
+            # Data minimal untuk QR code yang lebih sederhana
+            data = str(index)  # Hanya index saja!
             
-            # Data yang akan di-encrypt
-            data = {
-                'id': unique_id,
-                'label': label,
-                'index': index
-            }
+            # Encrypt (data sudah minimal)
+            encrypted = self.encrypt_data(data)
             
-            # Convert to JSON string
-            json_data = json.dumps(data)
-            
-            # Encrypt
-            encrypted = self.encrypt_data(json_data)
-            
-            # Generate QR code
+            # Generate QR code dengan setting untuk kamera low-res
             qr = qrcode.QRCode(
-                version=1,
-                error_correction=qrcode.constants.ERROR_CORRECT_H,
-                box_size=10,
-                border=4,
+                version=1,  # Versi terkecil
+                error_correction=qrcode.constants.ERROR_CORRECT_L,  # Low error correction (lebih simple)
+                box_size=20,  # DIPERBESAR dari 10 ke 20 (kotak lebih besar)
+                border=2,     # Border dikurangi dari 4 ke 2
             )
             qr.add_data(encrypted)
             qr.make(fit=True)
@@ -155,11 +147,13 @@ class QRCodeManager:
             
             img.save(filepath)
             
-            print(f"  [OK] {label} → {filename}")
+            if not silent:
+                print(f"  [OK] {label} -> {filename}")  # Changed arrow to ASCII
             return True
             
         except Exception as e:
-            print(f"  [X] Error generating QR for {label}: {e}")
+            if not silent:
+                print(f"  [X] Error generating QR for {label}: {e}")
             return False
     
     def scan_qr_from_camera(self, cam_index: int = 0, width: int = 640, height: int = 480) -> Optional[Dict]:
@@ -205,23 +199,43 @@ class QRCodeManager:
                 
                 if decrypted:
                     try:
-                        data = json.loads(decrypted)
+                        # Data sekarang hanya index (string)
+                        index = int(decrypted)
                         
-                        # Draw rectangle around QR code
-                        points = obj.polygon
-                        if len(points) == 4:
-                            pts = [(point.x, point.y) for point in points]
-                            cv2.polylines(frame, [np.array(pts, dtype=np.int32)], True, (0, 255, 0), 3)
+                        # Load labels untuk get label dari index
+                        label_path = os.path.join(self.db_dir, "labels.json")
+                        if os.path.exists(label_path):
+                            with open(label_path, 'r', encoding='utf-8') as f:
+                                labels = json.load(f)
+                            
+                            if index < len(labels):
+                                label = labels[index]
+                                
+                                # Prepare result
+                                data = {
+                                    'index': index,
+                                    'label': label,
+                                    'id': self._generate_id(label, index)
+                                }
+                                
+                                # Draw rectangle around QR code
+                                points = obj.polygon
+                                if len(points) == 4:
+                                    pts = [(point.x, point.y) for point in points]
+                                    cv2.polylines(frame, [np.array(pts, dtype=np.int32)], True, (0, 255, 0), 3)
+                                
+                                # Display info
+                                cv2.putText(frame, "QR Code Detected!", (10, 30),
+                                           cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                                cv2.putText(frame, f"Label: {data['label']}", (10, 60),
+                                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                                
+                                result = data
+                            else:
+                                cv2.putText(frame, "Invalid Index", (10, 30),
+                                           cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
                         
-                        # Display info
-                        cv2.putText(frame, "QR Code Detected!", (10, 30),
-                                   cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-                        cv2.putText(frame, f"Label: {data['label']}", (10, 60),
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-                        
-                        result = data
-                        
-                    except json.JSONDecodeError:
+                    except (json.JSONDecodeError, ValueError):
                         cv2.putText(frame, "Invalid QR Code", (10, 30),
                                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
                 else:
