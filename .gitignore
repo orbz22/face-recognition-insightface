@@ -62,3 +62,8 @@ logs/
 # Temporary files
 *.tmp
 *.temp
+
+# PyInstaller
+build/
+dist/
+*.spec
