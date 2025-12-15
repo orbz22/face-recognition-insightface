@@ -30,19 +30,16 @@ if errorlevel 1 (
 echo.
 echo [*] Step 2: Building EXE...
 echo     Ini akan memakan waktu beberapa menit...
+echo     (Ukuran EXE akan lebih besar tapi lebih stabil)
 echo.
 
+REM Build dengan minimal exclusions untuk menghindari dependency errors
+REM Hanya exclude Qt packages yang konflik
 pyinstaller --onefile --console --name="FaceRecognition" ^
     --exclude-module PyQt5 ^
     --exclude-module PyQt6 ^
     --exclude-module PySide2 ^
     --exclude-module PySide6 ^
-    --exclude-module tkinter ^
-    --exclude-module IPython ^
-    --exclude-module jupyter ^
-    --exclude-module notebook ^
-    --exclude-module pandas ^
-    --exclude-module pytest ^
     main.py
 
 if errorlevel 1 (
