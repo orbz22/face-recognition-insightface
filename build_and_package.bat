@@ -30,12 +30,13 @@ if errorlevel 1 (
 echo.
 echo [*] Step 2: Building EXE...
 echo     Ini akan memakan waktu beberapa menit...
-echo     (Ukuran EXE akan lebih besar tapi lebih stabil)
+echo     (Menggunakan onedir mode untuk kompatibilitas DLL)
 echo.
 
-REM Build dengan minimal exclusions untuk menghindari dependency errors
-REM Hanya exclude Qt packages yang konflik
-pyinstaller --onefile --console --name="FaceRecognition" ^
+REM Build dengan onedir mode (bukan onefile) untuk menghindari DLL issues
+REM onedir: Folder dengan dependencies (lebih stabil)
+REM onefile: Single EXE (sering masalah dengan DLL)
+pyinstaller --onedir --console --name="FaceRecognition" ^
     --exclude-module PyQt5 ^
     --exclude-module PyQt6 ^
     --exclude-module PySide2 ^
@@ -55,33 +56,33 @@ REM Buat folder distribusi
 if exist "FaceRecognition_Package" rmdir /s /q "FaceRecognition_Package"
 mkdir "FaceRecognition_Package"
 
-REM Copy EXE
-echo     - Copying EXE...
-copy "dist\FaceRecognition.exe" "FaceRecognition_Package\"
+REM Copy seluruh folder dist (onedir output)
+echo     - Copying program files...
+xcopy /E /I /Y "dist\FaceRecognition" "FaceRecognition_Package\FaceRecognition"
 
-REM Copy models
+REM Copy models ke dalam folder FaceRecognition
 echo     - Copying models...
 if exist "models" (
-    xcopy /E /I /Y "models" "FaceRecognition_Package\models"
+    xcopy /E /I /Y "models" "FaceRecognition_Package\FaceRecognition\models"
 ) else (
     echo     [!] Models tidak ditemukan, akan auto-download saat run
 )
 
-REM Buat folder face_db kosong
+REM Buat folder face_db di dalam FaceRecognition
 echo     - Creating face_db folder...
-mkdir "FaceRecognition_Package\face_db"
-echo Folder untuk database wajah > "FaceRecognition_Package\face_db\README.txt"
+mkdir "FaceRecognition_Package\FaceRecognition\face_db"
+echo Folder untuk database wajah > "FaceRecognition_Package\FaceRecognition\face_db\README.txt"
 
-REM Buat folder qr_codes kosong
+REM Buat folder qr_codes di dalam FaceRecognition
 echo     - Creating qr_codes folder...
-mkdir "FaceRecognition_Package\qr_codes"
-echo Folder untuk QR codes > "FaceRecognition_Package\qr_codes\README.txt"
+mkdir "FaceRecognition_Package\FaceRecognition\qr_codes"
+echo Folder untuk QR codes > "FaceRecognition_Package\FaceRecognition\qr_codes\README.txt"
 
-REM Copy README
+REM Copy README ke root folder
 echo     - Copying documentation...
 if exist "README.md" copy "README.md" "FaceRecognition_Package\"
 
-REM Buat file instruksi
+REM Buat file instruksi di root
 echo     - Creating user instructions...
 (
 echo ================================================
@@ -90,8 +91,9 @@ echo ================================================
 echo.
 echo CARA PAKAI:
 echo.
-echo 1. Double-click FaceRecognition.exe
-echo 2. Pilih menu yang diinginkan:
+echo 1. Masuk ke folder FaceRecognition
+echo 2. Double-click FaceRecognition.exe
+echo 3. Pilih menu yang diinginkan:
 echo    - Menu 1: Enroll ^(daftar wajah baru^)
 echo    - Menu 2: Recognize ^(kenali wajah^)
 echo    - Menu 3: Switch Camera
@@ -103,6 +105,11 @@ echo 1. Pilih menu 1
 echo 2. Input: Nama Ortu, Nama Anak, Kelas
 echo 3. Tekan 'c' untuk capture ^(10x^)
 echo 4. QR code otomatis di-generate
+echo.
+echo CATATAN PENTING:
+echo - JANGAN pindahkan FaceRecognition.exe keluar dari foldernya
+echo - Semua file DLL di folder ini diperlukan
+echo - Jalankan dari dalam folder FaceRecognition
 echo.
 echo SYSTEM REQUIREMENTS:
 echo - Windows 10/11
