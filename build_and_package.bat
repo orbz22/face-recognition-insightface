@@ -38,7 +38,6 @@ pyinstaller --onefile --console --name="FaceRecognition" ^
     --exclude-module PySide2 ^
     --exclude-module PySide6 ^
     --exclude-module tkinter ^
-    --exclude-module matplotlib ^
     --exclude-module IPython ^
     --exclude-module jupyter ^
     --exclude-module notebook ^
