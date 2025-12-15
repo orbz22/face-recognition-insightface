@@ -42,6 +42,10 @@ env/
 face_db/embeddings.npy
 face_db/labels.json
 face_db/snapshots/
+face_db/.qr_key
+
+# QR Codes (data pribadi, jangan commit)
+qr_codes/
 
 # Models (terlalu besar untuk git, ~340MB)
 models/*

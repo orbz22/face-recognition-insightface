@@ -14,6 +14,7 @@ from facegate_insightface import (
     open_camera
 )
 from logger import get_logger
+from qr_manager import QRCodeManager
 
 # Initialize logger
 logger = get_logger()
@@ -26,7 +27,8 @@ def print_menu(cam_index):
     print("1. Enroll (Daftarkan wajah baru)")
     print("2. Recognize (Kenali wajah)")
     print(f"3. Switch Camera (Saat ini: Camera {cam_index})")
-    print("4. Exit")
+    print("4. QR Code Menu")
+    print("5. Exit")
     print("="*50)
 
 
@@ -115,6 +117,69 @@ def switch_camera(current_index):
     else:
         # Kembali ke menu utama
         return current_index
+
+
+def qr_code_menu(cam_index: int):
+    """Menu untuk QR Code operations"""
+    qr_manager = QRCodeManager()
+    
+    while True:
+        print("\n" + "="*50)
+        print("  QR CODE MENU")
+        print("="*50)
+        print("1. Generate QR Codes untuk Semua")
+        print("2. Scan QR Code")
+        print("3. Kembali ke Menu Utama")
+        print("="*50)
+        
+        choice = input("\nPilih (1-3): ").strip()
+        
+        if choice == "1":
+            # Generate QR codes
+            print("\n[*] Generating QR Codes...")
+            count = qr_manager.generate_qr_for_all()
+            
+            if count > 0:
+                print(f"\n[OK] {count} QR codes telah di-generate!")
+                print(f"     Lokasi: qr_codes/")
+                print("\n[!] QR codes ini bisa dicetak dan diberikan ke orang tua")
+                print("    sebagai backup jika face recognition gagal.")
+            
+            input("\nTekan ENTER untuk kembali...")
+        
+        elif choice == "2":
+            # Scan QR code
+            print(f"\n[*] Membuka camera {cam_index} untuk scan QR code...")
+            result = qr_manager.scan_qr_from_camera(cam_index=cam_index)
+            
+            if result:
+                print(f"\n[OK] QR Code berhasil di-scan!")
+                print(f"     Label: {result['label']}")
+                
+                # Parse label
+                parts = result['label'].split('_')
+                if len(parts) >= 3:
+                    print(f"     Nama Ortu: {parts[0]}")
+                    print(f"     Nama Anak: {parts[1]}")
+                    print(f"     Kelas: {parts[2]}")
+                
+                # Verify
+                if qr_manager.verify_qr_data(result):
+                    print(f"     Status: VALID ✓")
+                    logger.log_access(result['label'], granted=True, reason="QR Code scan")
+                else:
+                    print(f"     Status: INVALID ✗")
+                    logger.log_access(result['label'], granted=False, reason="Invalid QR Code")
+            else:
+                print("\n[!] Tidak ada QR code yang ter-scan.")
+            
+            input("\nTekan ENTER untuk kembali...")
+        
+        elif choice == "3":
+            break
+        
+        else:
+            print("\n[X] Pilihan tidak valid!")
 
 
 def main():
@@ -239,12 +304,16 @@ def main():
                 logger.log_camera_switch(old_index, CAM_INDEX)
         
         elif choice == "4":
+            # QR Code Menu
+            qr_code_menu(CAM_INDEX)
+        
+        elif choice == "5":
             print("\n[*] Terima kasih! Keluar dari program...")
             logger.log_system("System shutdown")
             sys.exit(0)
         
         else:
-            print("\n[X] Pilihan tidak valid! Silakan pilih 1-4.")
+            print("\n[X] Pilihan tidak valid! Silakan pilih 1-5.")
 
 
 if __name__ == "__main__":

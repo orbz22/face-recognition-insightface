@@ -13,6 +13,12 @@ onnxruntime>=1.19.0
 # Untuk GPU (uncomment jika punya NVIDIA GPU):
 # onnxruntime-gpu>=1.19.0
 
+# QR Code support
+qrcode[pil]>=7.4.0
+pyzbar>=0.1.9
+cryptography>=41.0.0
+pillow>=10.0.0
+
 # Additional dependencies (otomatis terinstall dengan insightface)
 # albumentations
 # scikit-image
