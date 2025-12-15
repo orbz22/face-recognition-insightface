@@ -13,6 +13,10 @@ from facegate_insightface import (
     recognize_mode,
     open_camera
 )
+from logger import get_logger
+
+# Initialize logger
+logger = get_logger()
 
 
 def print_menu(cam_index):
@@ -131,11 +135,19 @@ def main():
     print(f"   Device: {DEVICE}")
     print(f"   Camera: {CAM_INDEX}")
     
+    logger.log_system(f"System started | Model: {MODEL_NAME} | Device: {DEVICE} | Camera: {CAM_INDEX}")
+    
     # Inisialisasi
     db = FaceDB(DB_DIR)
-    app = build_face_app(model_name=MODEL_NAME, det_size=DET_SIZE, device=DEVICE)
     
-    print("[OK] Model berhasil dimuat!\n")
+    try:
+        app = build_face_app(model_name=MODEL_NAME, det_size=DET_SIZE, device=DEVICE)
+        logger.log_model_load(MODEL_NAME, DEVICE, success=True)
+        print("[OK] Model berhasil dimuat!\n")
+    except Exception as e:
+        logger.log_model_load(MODEL_NAME, DEVICE, success=False)
+        logger.log_error("ModelLoadError", str(e))
+        raise
     
     while True:
         print_menu(CAM_INDEX)
@@ -193,10 +205,14 @@ def main():
         
         elif choice == "3":
             # Switch Camera
+            old_index = CAM_INDEX
             CAM_INDEX = switch_camera(CAM_INDEX)
+            if old_index != CAM_INDEX:
+                logger.log_camera_switch(old_index, CAM_INDEX)
         
         elif choice == "4":
             print("\n[*] Terima kasih! Keluar dari program...")
+            logger.log_system("System shutdown")
             sys.exit(0)
         
         else:
@@ -208,7 +224,9 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         print("\n\n[*] Program dihentikan oleh user. Bye!")
+        logger.log_system("System interrupted by user")
         sys.exit(0)
     except Exception as e:
         print(f"\n[X] Error: {e}")
+        logger.log_error("SystemError", str(e), context="main")
         sys.exit(1)

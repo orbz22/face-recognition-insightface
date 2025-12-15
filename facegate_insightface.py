@@ -11,6 +11,11 @@ import numpy as np
 # InsightFace
 from insightface.app import FaceAnalysis
 
+# Logger
+from logger import get_logger
+
+logger = get_logger()
+
 
 # =========================
 # Utils
@@ -247,6 +252,8 @@ def enroll_mode(app: FaceAnalysis,
 
     if len(collected) == 0:
         print("Tidak ada sample. Enroll dibatalkan.")
+        logger.log_enrollment(name, 0, success=False, camera_index=cam_index, 
+                            notes="No samples collected")
         return
 
     # rata-rata lalu normalize
@@ -254,6 +261,7 @@ def enroll_mode(app: FaceAnalysis,
     avg_emb = l2_normalize(avg_emb)
 
     db.add(avg_emb, name)
+    logger.log_enrollment(name, len(collected), success=True, camera_index=cam_index)
     print(f"\n✅ Enroll selesai. '{name}' ditambahkan ke database ({db.db_dir}).")
 
 
@@ -303,8 +311,10 @@ def recognize_mode(app: FaceAnalysis,
             if best_sim >= threshold:
                 name = labels[best_idx]
                 draw_box_and_text(disp, face, f"{name} | sim={best_sim:.2f}")
+                logger.log_recognition(name, best_sim, cam_index, threshold)
             else:
                 draw_box_and_text(disp, face, f"Unknown | sim={best_sim:.2f}")
+                logger.log_recognition(None, best_sim, cam_index, threshold)
 
         else:
             cv2.putText(disp, "No face / low confidence", (20, 40),
