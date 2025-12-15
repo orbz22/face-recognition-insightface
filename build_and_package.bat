@@ -32,7 +32,20 @@ echo [*] Step 2: Building EXE...
 echo     Ini akan memakan waktu beberapa menit...
 echo.
 
-pyinstaller --onefile --console --name="FaceRecognition" main.py
+pyinstaller --onefile --console --name="FaceRecognition" ^
+    --exclude-module PyQt5 ^
+    --exclude-module PyQt6 ^
+    --exclude-module PySide2 ^
+    --exclude-module PySide6 ^
+    --exclude-module tkinter ^
+    --exclude-module matplotlib ^
+    --exclude-module IPython ^
+    --exclude-module jupyter ^
+    --exclude-module notebook ^
+    --exclude-module scipy ^
+    --exclude-module pandas ^
+    --exclude-module pytest ^
+    main.py
 
 if errorlevel 1 (
     echo [X] Build gagal!
