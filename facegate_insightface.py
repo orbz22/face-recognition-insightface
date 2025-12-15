@@ -172,8 +172,38 @@ def open_camera(cam_index: int, width: int, height: int) -> cv2.VideoCapture:
     return cap
 
 def draw_box_and_text(img, face, text: str):
+    """Draw bounding box and text. Supports formatted labels: ParentName_ChildName_Class"""
     x1, y1, x2, y2 = face.bbox.astype(int)
     cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+    
+    # Parse label jika format: NamaOrtu_NamaAnak_Kelas
+    if '_' in text and text.count('_') >= 2:
+        parts = text.split('|')[0].strip()  # Ambil bagian sebelum '|' (jika ada similarity)
+        
+        if '_' in parts:
+            label_parts = parts.split('_')
+            if len(label_parts) >= 3:
+                parent = label_parts[0]
+                child = label_parts[1]
+                class_name = label_parts[2]
+                
+                # Display multi-line
+                y_offset = max(10, y1 - 60)
+                cv2.putText(img, f"Ortu: {parent}", (x1, y_offset), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2, cv2.LINE_AA)
+                cv2.putText(img, f"Anak: {child}", (x1, y_offset + 20), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2, cv2.LINE_AA)
+                cv2.putText(img, f"Kelas: {class_name}", (x1, y_offset + 40), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2, cv2.LINE_AA)
+                
+                # Tampilkan similarity jika ada
+                if '|' in text:
+                    similarity_text = text.split('|')[1].strip()
+                    cv2.putText(img, similarity_text, (x1, y_offset + 60), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1, cv2.LINE_AA)
+                return
+    
+    # Fallback: tampilan biasa
     y = max(0, y1 - 10)
     cv2.putText(img, text, (x1, y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2, cv2.LINE_AA)
 

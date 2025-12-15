@@ -155,12 +155,40 @@ def main():
         
         if choice == "1":
             # Enroll mode
-            name = input("\nMasukkan nama orang yang akan didaftarkan: ").strip()
-            if not name:
-                print("[X] Nama tidak boleh kosong!")
+            print("\n[*] ENROLLMENT - Pendaftaran Wajah Orang Tua")
+            print("="*50)
+            
+            # Input data lengkap
+            parent_name = input("Nama Orang Tua: ").strip()
+            if not parent_name:
+                print("[X] Nama orang tua tidak boleh kosong!")
                 continue
             
-            print(f"\n[*] Mode Enroll untuk: {name}")
+            child_name = input("Nama Anak: ").strip()
+            if not child_name:
+                print("[X] Nama anak tidak boleh kosong!")
+                continue
+            
+            child_class = input("Kelas Anak (contoh: 3A, 5B): ").strip()
+            if not child_class:
+                print("[X] Kelas anak tidak boleh kosong!")
+                continue
+            
+            # Format: NamaOrtu_NamaAnak_Kelas
+            full_label = f"{parent_name}_{child_name}_{child_class}"
+            
+            print(f"\n[*] Data yang akan didaftarkan:")
+            print(f"   Nama Orang Tua: {parent_name}")
+            print(f"   Nama Anak: {child_name}")
+            print(f"   Kelas: {child_class}")
+            print(f"   Label Database: {full_label}")
+            
+            confirm = input("\nApakah data sudah benar? (y/n): ").strip().lower()
+            if confirm != 'y':
+                print("[!] Pendaftaran dibatalkan.")
+                continue
+            
+            print(f"\n[*] Mode Enroll untuk: {parent_name}")
             print("   Instruksi:")
             print("   - Arahkan wajah ke kamera")
             print("   - Tekan 'c' untuk capture sample")
@@ -173,7 +201,7 @@ def main():
             enroll_mode(
                 app=app,
                 db=db,
-                name=name,
+                name=full_label,
                 cam_index=CAM_INDEX,
                 width=WIDTH,
                 height=HEIGHT,
