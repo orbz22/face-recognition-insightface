@@ -1,0 +1,21 @@
+# Face Recognition System - InsightFace
+# Requirements file untuk instalasi dependencies
+
+# Core dependencies
+numpy>=1.26.0
+opencv-python>=4.8.0
+insightface>=0.7.3
+
+# ONNX Runtime (pilih salah satu)
+# Untuk CPU only (Raspberry Pi / PC tanpa GPU):
+onnxruntime>=1.19.0
+
+# Untuk GPU (uncomment jika punya NVIDIA GPU):
+# onnxruntime-gpu>=1.19.0
+
+# Additional dependencies (otomatis terinstall dengan insightface)
+# albumentations
+# scikit-image
+# Pillow
+# tqdm
+# requests
