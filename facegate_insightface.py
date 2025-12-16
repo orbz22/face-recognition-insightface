@@ -346,6 +346,12 @@ def recognize_mode(app: FaceAnalysis,
     - threshold perlu dikalibrasi (0.3 - 0.5 tergantung model & kondisi).
     """
     embs, labels = db.load()
+    
+    # Check if database is empty or invalid
+    if embs is None or labels is None:
+        print(f"DB error. Tidak bisa load database. (folder: {db.db_dir})")
+        return
+    
     if embs.shape[0] == 0:
         print(f"DB kosong. Jalankan enroll dulu. (folder: {db.db_dir})")
         return
