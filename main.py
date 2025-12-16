@@ -14,10 +14,11 @@ from facegate_insightface import (
     open_camera
 )
 from logger import get_logger
-from qr_manager import QRCodeManager
 
 # Initialize logger
 logger = get_logger()
+
+# QR Manager will be imported lazily when needed (to avoid pyzbar DLL issues)
 
 
 def print_menu(cam_index):
@@ -121,7 +122,28 @@ def switch_camera(current_index):
 
 def qr_code_menu(cam_index: int):
     """Menu untuk QR Code operations"""
-    qr_manager = QRCodeManager()
+    # Lazy import QR manager (avoid pyzbar DLL issues on startup)
+    try:
+        from qr_manager import QRCodeManager
+        qr_manager = QRCodeManager()
+    except Exception as e:
+        print("\n" + "="*50)
+        print("  QR CODE - ERROR")
+        print("="*50)
+        print(f"\n[X] QR Code feature tidak tersedia!")
+        print(f"    Error: {str(e)}")
+        print(f"\n[!] Kemungkinan penyebab:")
+        print(f"    - pyzbar library tidak terinstall dengan benar")
+        print(f"    - zbar DLL tidak ditemukan")
+        print(f"\n[*] Solusi:")
+        print(f"    1. Install pyzbar: pip install pyzbar")
+        print(f"    2. Download zbar DLL dari:")
+        print(f"       http://zbar.sourceforge.net/")
+        print(f"    3. Atau gunakan face recognition saja (tanpa QR)")
+        print(f"\n[*] Program tetap bisa digunakan untuk face recognition!")
+        print("="*50)
+        input("\nTekan ENTER untuk kembali...")
+        return
     
     while True:
         print("\n" + "="*50)
