@@ -428,11 +428,37 @@ def recognize_mode(app: FaceAnalysis,
                 inference_time = time.time() - inference_start
                 perf_monitor.record_inference_time(inference_time)
 
-            # Process ALL detected faces
+
+            # Process faces with SMART MODE (adaptive)
             recognized_faces = []
             
             if faces and len(faces) > 0:
-                for face in faces:
+                # SMART MODE LOGIC:
+                # - 1 face: Process 1 (fastest)
+                # - 2-3 faces: Process all (useful for parent+child)
+                # - 4+ faces: Process top 3 only (performance balance)
+                
+                num_faces = len(faces)
+                
+                if num_faces == 1:
+                    # Single face: Process immediately (fastest path)
+                    faces_to_process = faces
+                    mode_text = "FAST"
+                elif num_faces <= 3:
+                    # 2-3 faces: Process all (parent+child scenario)
+                    faces_to_process = faces
+                    mode_text = "ALL"
+                else:
+                    # 4+ faces: Process top 3 largest (performance balance)
+                    # Sort by face area (largest first)
+                    faces_sorted = sorted(faces, 
+                                        key=lambda f: (f.bbox[2]-f.bbox[0])*(f.bbox[3]-f.bbox[1]), 
+                                        reverse=True)
+                    faces_to_process = faces_sorted[:3]
+                    mode_text = "TOP3"
+                
+                # Process selected faces
+                for face in faces_to_process:
                     if float(face.det_score) >= min_det_score:
                         emb = face.normed_embedding.astype(np.float32)
                         emb = l2_normalize(emb)
@@ -449,19 +475,45 @@ def recognize_mode(app: FaceAnalysis,
                         else:
                             recognized_faces.append((face, f"Unknown | sim={best_sim:.2f}", False))
                             logger.log_recognition(None, best_sim, cam_index, threshold)
+                
+                # Store mode info for display
+                if recognized_faces:
+                    # Add mode info to first face for display
+                    face_info = recognized_faces[0]
+                    recognized_faces[0] = (face_info[0], face_info[1], face_info[2], mode_text, num_faces)
             
             # Cache results for all faces
             last_result = recognized_faces if recognized_faces else None
         
+        
         # Draw all recognized faces (even on skipped frames for smooth display)
         if last_result is not None and len(last_result) > 0:
-            for face, text, _ in last_result:
+            # Extract mode info if available (from first face)
+            mode_text = None
+            total_detected = None
+            
+            for idx, face_data in enumerate(last_result):
+                # Handle both old format (3 items) and new format (5 items)
+                if len(face_data) == 5:
+                    face, text, _, mode, total = face_data
+                    if idx == 0:  # Only get mode from first face
+                        mode_text = mode
+                        total_detected = total
+                else:
+                    face, text, _ = face_data
+                
                 draw_box_and_text(disp, face, text)
             
-            # Add face count indicator
-            face_count_text = f"Faces: {len(last_result)}"
-            cv2.putText(disp, face_count_text, (disp.shape[1] - 150, 30),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2, cv2.LINE_AA)
+            # Add Smart Mode indicator
+            if mode_text and total_detected:
+                mode_display = f"Mode: {mode_text} ({len(last_result)}/{total_detected})"
+                cv2.putText(disp, mode_display, (disp.shape[1] - 250, 30),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2, cv2.LINE_AA)
+            else:
+                # Fallback: just show count
+                face_count_text = f"Faces: {len(last_result)}"
+                cv2.putText(disp, face_count_text, (disp.shape[1] - 150, 30),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2, cv2.LINE_AA)
         else:
             cv2.putText(disp, "No face / low confidence", (20, 40),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
