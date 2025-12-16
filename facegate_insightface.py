@@ -374,33 +374,47 @@ def recognize_mode(app: FaceAnalysis,
     print("\n[RECOGNIZE]")
     print("Tekan 'q' untuk keluar.\n")
 
+    frame_count = 0
+    last_result = None  # Cache last recognition result
+    
     while True:
         ok, frame = cap.read()
         if not ok:
             print("Gagal baca frame.")
             break
 
-        faces = app.get(frame)
-        face = pick_largest_face(faces)
-
+        frame_count += 1
         disp = frame.copy()
-        if face is not None and float(face.det_score) >= min_det_score:
-            emb = face.normed_embedding.astype(np.float32)
-            emb = l2_normalize(emb)
+        
+        # Process every 3rd frame for better performance
+        # Display cached result on skipped frames
+        if frame_count % 3 == 0:
+            faces = app.get(frame)
+            face = pick_largest_face(faces)
 
-            # cosine similarity: embs already normalized
-            sims = embs @ emb  # (N,)
-            best_idx = int(np.argmax(sims))
-            best_sim = float(sims[best_idx])
+            if face is not None and float(face.det_score) >= min_det_score:
+                emb = face.normed_embedding.astype(np.float32)
+                emb = l2_normalize(emb)
 
-            if best_sim >= threshold:
-                name = labels[best_idx]
-                draw_box_and_text(disp, face, f"{name} | sim={best_sim:.2f}")
-                logger.log_recognition(name, best_sim, cam_index, threshold)
+                # cosine similarity: embs already normalized
+                sims = embs @ emb  # (N,)
+                best_idx = int(np.argmax(sims))
+                best_sim = float(sims[best_idx])
+
+                if best_sim >= threshold:
+                    name = labels[best_idx]
+                    last_result = (face, f"{name} | sim={best_sim:.2f}", True)
+                    logger.log_recognition(name, best_sim, cam_index, threshold)
+                else:
+                    last_result = (face, f"Unknown | sim={best_sim:.2f}", False)
+                    logger.log_recognition(None, best_sim, cam_index, threshold)
             else:
-                draw_box_and_text(disp, face, f"Unknown | sim={best_sim:.2f}")
-                logger.log_recognition(None, best_sim, cam_index, threshold)
-
+                last_result = None
+        
+        # Draw last result (even on skipped frames for smooth display)
+        if last_result is not None:
+            face, text, _ = last_result
+            draw_box_and_text(disp, face, text)
         else:
             cv2.putText(disp, "No face / low confidence", (20, 40),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)

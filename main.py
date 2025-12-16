@@ -202,9 +202,9 @@ def main():
     MODEL_NAME = "buffalo_l"  # buffalo_l untuk akurasi lebih baik
     DEVICE = "cpu"  # ganti ke "cuda" jika punya GPU
     CAM_INDEX = 1  # Camera index 1 (bisa diubah via menu)
-    WIDTH = 1280
-    HEIGHT = 720
-    DET_SIZE = 640
+    WIDTH = 640   # Reduced from 1280 for better performance
+    HEIGHT = 480  # Reduced from 720 for better performance
+    DET_SIZE = 320  # Reduced from 640 for faster detection
     MIN_DET_SCORE = 0.6
     SAMPLES = 10
     THRESHOLD = 0.35
