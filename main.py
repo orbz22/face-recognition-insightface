@@ -277,17 +277,22 @@ def main():
             
             input("Tekan ENTER untuk mulai...")
             
-            enroll_mode(
-                app=app,
-                db=db,
-                name=full_label,
-                cam_index=CAM_INDEX,
-                width=WIDTH,
-                height=HEIGHT,
-                samples=SAMPLES,
-                min_det_score=MIN_DET_SCORE,
-                save_snapshots=True
-            )
+            try:
+                enroll_mode(
+                    app=app,
+                    db=db,
+                    name=full_label,
+                    cam_index=CAM_INDEX,
+                    width=WIDTH,
+                    height=HEIGHT,
+                    samples=SAMPLES,
+                    min_det_score=MIN_DET_SCORE,
+                    save_snapshots=True
+                )
+            except Exception as e:
+                print(f"\n[X] Error saat enrollment: {e}")
+                logger.log_error("EnrollmentError", str(e))
+                input("\nTekan ENTER untuk kembali...")
         
         elif choice == "2":
             # Recognize mode
@@ -300,15 +305,20 @@ def main():
             
             input("Tekan ENTER untuk mulai...")
             
-            recognize_mode(
-                app=app,
-                db=db,
-                cam_index=CAM_INDEX,
-                width=WIDTH,
-                height=HEIGHT,
-                threshold=THRESHOLD,
-                min_det_score=MIN_DET_SCORE
-            )
+            try:
+                recognize_mode(
+                    app=app,
+                    db=db,
+                    cam_index=CAM_INDEX,
+                    width=WIDTH,
+                    height=HEIGHT,
+                    threshold=THRESHOLD,
+                    min_det_score=MIN_DET_SCORE
+                )
+            except Exception as e:
+                print(f"\n[X] Error saat recognition: {e}")
+                logger.log_error("RecognitionError", str(e))
+                input("\nTekan ENTER untuk kembali...")
         
         elif choice == "3":
             # Switch Camera
