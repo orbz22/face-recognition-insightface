@@ -15,6 +15,14 @@ from insightface.app import FaceAnalysis
 # Logger
 from logger import get_logger
 
+# Performance Monitor
+try:
+    from performance_monitor import PerformanceMonitor
+    PERF_MONITOR_AVAILABLE = True
+except ImportError:
+    PERF_MONITOR_AVAILABLE = False
+    PerformanceMonitor = None
+
 logger = get_logger()
 
 
@@ -350,7 +358,8 @@ def recognize_mode(app: FaceAnalysis,
                    width: int = 1280,
                    height: int = 720,
                    threshold: float = 0.35,
-                   min_det_score: float = 0.6):
+                   min_det_score: float = 0.6,
+                   show_performance: bool = True):
     """
     Real-time recognition:
     - ambil embedding wajah terbesar
@@ -372,12 +381,33 @@ def recognize_mode(app: FaceAnalysis,
 
     cap = open_camera(cam_index, width, height)
     print("\n[RECOGNIZE]")
-    print("Tekan 'q' untuk keluar.\n")
+    print("Tekan 'q' untuk keluar.")
+    if show_performance and PERF_MONITOR_AVAILABLE:
+        print("Tekan 'p' untuk toggle performance stats.")
+        print("Performance akan di-log ke: logs/performance.log")
+    print()
 
+    # Initialize performance monitor
+    perf_monitor = PerformanceMonitor() if PERF_MONITOR_AVAILABLE else None
+    show_perf_overlay = show_performance and PERF_MONITOR_AVAILABLE
+    
+    # Initialize performance logger
+    perf_logger = None
+    if PERF_MONITOR_AVAILABLE:
+        try:
+            from performance_monitor import PerformanceLogger
+            perf_logger = PerformanceLogger("logs/performance.log")
+        except Exception as e:
+            print(f"[!] Performance logging disabled: {e}")
+    
     frame_count = 0
     last_result = None  # Cache last recognition result
     
     while True:
+        # Start frame timing
+        if perf_monitor:
+            perf_monitor.start_frame()
+        
         ok, frame = cap.read()
         if not ok:
             print("Gagal baca frame.")
@@ -389,43 +419,89 @@ def recognize_mode(app: FaceAnalysis,
         # Process every 3rd frame for better performance
         # Display cached result on skipped frames
         if frame_count % 3 == 0:
+            # Time inference
+            inference_start = time.time()
+            
             faces = app.get(frame)
-            face = pick_largest_face(faces)
+            
+            if perf_monitor:
+                inference_time = time.time() - inference_start
+                perf_monitor.record_inference_time(inference_time)
 
-            if face is not None and float(face.det_score) >= min_det_score:
-                emb = face.normed_embedding.astype(np.float32)
-                emb = l2_normalize(emb)
+            # Process ALL detected faces
+            recognized_faces = []
+            
+            if faces and len(faces) > 0:
+                for face in faces:
+                    if float(face.det_score) >= min_det_score:
+                        emb = face.normed_embedding.astype(np.float32)
+                        emb = l2_normalize(emb)
 
-                # cosine similarity: embs already normalized
-                sims = embs @ emb  # (N,)
-                best_idx = int(np.argmax(sims))
-                best_sim = float(sims[best_idx])
+                        # cosine similarity: embs already normalized
+                        sims = embs @ emb  # (N,)
+                        best_idx = int(np.argmax(sims))
+                        best_sim = float(sims[best_idx])
 
-                if best_sim >= threshold:
-                    name = labels[best_idx]
-                    last_result = (face, f"{name} | sim={best_sim:.2f}", True)
-                    logger.log_recognition(name, best_sim, cam_index, threshold)
-                else:
-                    last_result = (face, f"Unknown | sim={best_sim:.2f}", False)
-                    logger.log_recognition(None, best_sim, cam_index, threshold)
-            else:
-                last_result = None
+                        if best_sim >= threshold:
+                            name = labels[best_idx]
+                            recognized_faces.append((face, f"{name} | sim={best_sim:.2f}", True))
+                            logger.log_recognition(name, best_sim, cam_index, threshold)
+                        else:
+                            recognized_faces.append((face, f"Unknown | sim={best_sim:.2f}", False))
+                            logger.log_recognition(None, best_sim, cam_index, threshold)
+            
+            # Cache results for all faces
+            last_result = recognized_faces if recognized_faces else None
         
-        # Draw last result (even on skipped frames for smooth display)
-        if last_result is not None:
-            face, text, _ = last_result
-            draw_box_and_text(disp, face, text)
+        # Draw all recognized faces (even on skipped frames for smooth display)
+        if last_result is not None and len(last_result) > 0:
+            for face, text, _ in last_result:
+                draw_box_and_text(disp, face, text)
+            
+            # Add face count indicator
+            face_count_text = f"Faces: {len(last_result)}"
+            cv2.putText(disp, face_count_text, (disp.shape[1] - 150, 30),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2, cv2.LINE_AA)
         else:
             cv2.putText(disp, "No face / low confidence", (20, 40),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+        
+        # Draw performance overlay
+        if show_perf_overlay and perf_monitor:
+            stats_text = perf_monitor.get_stats_string()
+            # Background for better readability
+            cv2.rectangle(disp, (5, disp.shape[0] - 35), (disp.shape[1] - 5, disp.shape[0] - 5), 
+                         (0, 0, 0), -1)
+            cv2.putText(disp, stats_text, (10, disp.shape[0] - 15),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
 
         cv2.imshow("Recognize - press q to quit", disp)
+        
+        # End frame timing
+        if perf_monitor:
+            perf_monitor.end_frame()
+            
+            # Log performance every 30 frames
+            if perf_logger and frame_count % 30 == 0:
+                try:
+                    perf_logger.log(perf_monitor)
+                except Exception as e:
+                    pass  # Silent fail for logging
+        
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
             break
+        elif key == ord('p') and perf_monitor:
+            # Toggle performance overlay
+            show_perf_overlay = not show_perf_overlay
 
     cap.release()
     cv2.destroyAllWindows()
+    
+    # Print final stats
+    if perf_monitor:
+        print("\n[*] Performance Summary:")
+        perf_monitor.print_stats()
 
 
 # =========================

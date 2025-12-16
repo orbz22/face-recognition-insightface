@@ -26,3 +26,6 @@ pillow>=10.0.0
 # scikit-image
 # tqdm
 # requests
+
+# Performance monitoring
+psutil>=5.9.0  # For CPU and memory monitoring
