@@ -117,18 +117,33 @@ def build_face_app(model_name: str = "buffalo_l", det_size: int = 640, device: s
     """
     # Tentukan model root path
     if model_root is None:
-        # Gunakan direktori script ini sebagai root
-        # InsightFace akan otomatis cari di <root>/models/<model_name>
-        model_root = os.path.dirname(os.path.abspath(__file__))
+        # Check if running from PyInstaller
+        if getattr(sys, 'frozen', False):
+            # Running from PyInstaller EXE
+            # sys.executable points to the EXE file
+            # We want the directory containing the EXE
+            model_root = os.path.dirname(sys.executable)
+        else:
+            # Running from Python script
+            model_root = os.path.dirname(os.path.abspath(__file__))
     
-    # Pastikan folder model ada
     # InsightFace akan cari di: model_root/models/model_name
     expected_model_path = os.path.join(model_root, "models", model_name)
+    
+    # Jika tidak ditemukan, coba cari di parent directory (untuk compatibility)
+    if not os.path.exists(expected_model_path):
+        parent_root = os.path.dirname(model_root)
+        alternative_path = os.path.join(parent_root, "models", model_name)
+        if os.path.exists(alternative_path):
+            model_root = parent_root
+            expected_model_path = alternative_path
+    
     if not os.path.exists(expected_model_path):
         raise FileNotFoundError(
             f"Model tidak ditemukan di: {expected_model_path}\n"
             f"Pastikan folder 'models/{model_name}' ada dan berisi file .onnx\n"
-            f"Model root: {model_root}"
+            f"Model root: {model_root}\n"
+            f"Coba copy folder 'models' ke: {model_root}"
         )
     
     print(f"Loading model dari: {expected_model_path}")
