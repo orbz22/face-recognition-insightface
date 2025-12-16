@@ -57,12 +57,23 @@ class FaceDB:
         if os.path.exists(self.emb_path) and os.path.exists(self.label_path):
             try:
                 embs = np.load(self.emb_path).astype(np.float32)
+                
+                # Check if load failed
+                if embs is None:
+                    print(f"Warning: Failed to load embeddings from {self.emb_path}")
+                    return np.zeros((0, 512), dtype=np.float32), []
+                
                 with open(self.label_path, "r", encoding="utf-8") as f:
                     content = f.read().strip()
                     if not content:
                         # File kosong, return empty
                         return np.zeros((0, 512), dtype=np.float32), []
                     labels = json.loads(content)
+                
+                # Check if labels is valid
+                if labels is None:
+                    print(f"Warning: Failed to load labels from {self.label_path}")
+                    return np.zeros((0, 512), dtype=np.float32), []
                 
                 # Validasi: pastikan jumlah embeddings dan labels sama
                 if embs.shape[0] != len(labels):
@@ -75,6 +86,9 @@ class FaceDB:
                 return embs, labels
             except (json.JSONDecodeError, ValueError) as e:
                 print(f"Warning: Error loading DB files ({e}). Returning empty DB.")
+                return np.zeros((0, 512), dtype=np.float32), []
+            except Exception as e:
+                print(f"Warning: Unexpected error loading DB ({e}). Returning empty DB.")
                 return np.zeros((0, 512), dtype=np.float32), []
         return np.zeros((0, 512), dtype=np.float32), []
 
