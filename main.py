@@ -15,10 +15,18 @@ from facegate_insightface import (
 )
 from logger import get_logger
 
+# Try to import QR manager (optional - may fail if DLLs missing)
+try:
+    from qr_manager import QRCodeManager
+    QR_AVAILABLE = True
+except Exception as e:
+    print(f"[!] QR Code feature unavailable: {e}")
+    print("    Program will continue without QR code support.")
+    QR_AVAILABLE = False
+    QRCodeManager = None
+
 # Initialize logger
 logger = get_logger()
-
-# QR Manager will be imported lazily when needed (to avoid pyzbar DLL issues)
 
 
 def print_menu(cam_index):
@@ -28,7 +36,12 @@ def print_menu(cam_index):
     print("1. Enroll (Daftarkan wajah baru)")
     print("2. Recognize (Kenali wajah)")
     print(f"3. Switch Camera (Saat ini: Camera {cam_index})")
-    print("4. QR Code Menu")
+    
+    if QR_AVAILABLE:
+        print("4. QR Code Menu")
+    else:
+        print("4. QR Code Menu (UNAVAILABLE - DLL missing)")
+    
     print("5. Exit")
     print("="*50)
 
@@ -122,28 +135,7 @@ def switch_camera(current_index):
 
 def qr_code_menu(cam_index: int):
     """Menu untuk QR Code operations"""
-    # Lazy import QR manager (avoid pyzbar DLL issues on startup)
-    try:
-        from qr_manager import QRCodeManager
-        qr_manager = QRCodeManager()
-    except Exception as e:
-        print("\n" + "="*50)
-        print("  QR CODE - ERROR")
-        print("="*50)
-        print(f"\n[X] QR Code feature tidak tersedia!")
-        print(f"    Error: {str(e)}")
-        print(f"\n[!] Kemungkinan penyebab:")
-        print(f"    - pyzbar library tidak terinstall dengan benar")
-        print(f"    - zbar DLL tidak ditemukan")
-        print(f"\n[*] Solusi:")
-        print(f"    1. Install pyzbar: pip install pyzbar")
-        print(f"    2. Download zbar DLL dari:")
-        print(f"       http://zbar.sourceforge.net/")
-        print(f"    3. Atau gunakan face recognition saja (tanpa QR)")
-        print(f"\n[*] Program tetap bisa digunakan untuk face recognition!")
-        print("="*50)
-        input("\nTekan ENTER untuk kembali...")
-        return
+    qr_manager = QRCodeManager()
     
     while True:
         print("\n" + "="*50)
@@ -327,7 +319,13 @@ def main():
         
         elif choice == "4":
             # QR Code Menu
-            qr_code_menu(CAM_INDEX)
+            if QR_AVAILABLE:
+                qr_code_menu(CAM_INDEX)
+            else:
+                print("\n[X] QR Code feature tidak tersedia!")
+                print("    Pyzbar DLL (libiconv.dll) tidak ditemukan.")
+                print("    Program tetap bisa digunakan tanpa fitur QR code.")
+                input("\nTekan ENTER untuk kembali...")
         
         elif choice == "5":
             print("\n[*] Terima kasih! Keluar dari program...")
