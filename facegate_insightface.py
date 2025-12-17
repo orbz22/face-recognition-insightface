@@ -53,71 +53,58 @@ def now_str() -> str:
 class FaceDB:
     db_dir: str
     emb_path: str
-    label_path: str
 
     def __init__(self, db_dir: str = "face_db"):
         self.db_dir = db_dir
         ensure_dir(db_dir)
         self.emb_path = os.path.join(db_dir, "embeddings.npy")
-        self.label_path = os.path.join(db_dir, "labels.json")
 
-    def load(self) -> Tuple[np.ndarray, List[str]]:
-        if os.path.exists(self.emb_path) and os.path.exists(self.label_path):
+    def load(self) -> np.ndarray:
+        """Load embeddings only (no labels)"""
+        if os.path.exists(self.emb_path):
             try:
                 embs = np.load(self.emb_path).astype(np.float32)
                 
                 # Check if load failed
-                if embs is None:
-                    print(f"Warning: Failed to load embeddings from {self.emb_path}")
-                    return np.zeros((0, 512), dtype=np.float32), []
-                
-                with open(self.label_path, "r", encoding="utf-8") as f:
-                    content = f.read().strip()
-                    if not content:
-                        # File kosong, return empty
-                        return np.zeros((0, 512), dtype=np.float32), []
-                    labels = json.loads(content)
-                
-                # Check if labels is valid
-                if labels is None:
-                    print(f"Warning: Failed to load labels from {self.label_path}")
-                    return np.zeros((0, 512), dtype=np.float32), []
-                
-                # Validasi: pastikan jumlah embeddings dan labels sama
-                if embs.shape[0] != len(labels):
-                    print(f"⚠️  Warning: Database mismatch! Embeddings: {embs.shape[0]}, Labels: {len(labels)}")
-                    print(f"   Database corrupted. Please delete {self.db_dir} and re-enroll.")
-                    return np.zeros((0, 512), dtype=np.float32), []
+                if embs is None or len(embs) == 0:
+                    print(f"Warning: No embeddings in {self.emb_path}")
+                    return np.zeros((0, 512), dtype=np.float32)
                 
                 # Normalize for cosine search
-                embs = np.stack([l2_normalize(e) for e in embs], axis=0) if len(embs) else embs
-                return embs, labels
-            except (json.JSONDecodeError, ValueError) as e:
-                print(f"Warning: Error loading DB files ({e}). Returning empty DB.")
-                return np.zeros((0, 512), dtype=np.float32), []
+                embs = np.stack([l2_normalize(e) for e in embs], axis=0)
+                return embs
             except Exception as e:
-                print(f"Warning: Unexpected error loading DB ({e}). Returning empty DB.")
-                return np.zeros((0, 512), dtype=np.float32), []
-        return np.zeros((0, 512), dtype=np.float32), []
-
-    def save(self, embs: np.ndarray, labels: List[str]) -> None:
-        np.save(self.emb_path, embs.astype(np.float32))
-        with open(self.label_path, "w", encoding="utf-8") as f:
-            json.dump(labels, f, ensure_ascii=False, indent=2)
-
-    def add(self, emb: np.ndarray, label: str) -> None:
-        embs, labels = self.load()
-        emb = l2_normalize(emb.astype(np.float32))
-        if embs.shape[0] == 0:
-            # infer dim from embedding
-            embs = emb.reshape(1, -1)
+                print(f"Warning: Error loading embeddings ({e}). Returning empty.")
+                return np.zeros((0, 512), dtype=np.float32)
         else:
-            # guard dimension mismatch
+            return np.zeros((0, 512), dtype=np.float32)
+
+    def add(self, emb: np.ndarray) -> int:
+        """
+        Add embedding and return its index
+        
+        Returns:
+            index: Index of the added embedding
+        """
+        embs = self.load()
+        emb = l2_normalize(emb.astype(np.float32))
+        
+        # Append new embedding
+        if len(embs) == 0:
+            new_embs = emb.reshape(1, -1)
+            index = 0
+        else:
+            # Guard dimension mismatch
             if emb.shape[0] != embs.shape[1]:
                 raise ValueError(f"Embedding dim mismatch: got {emb.shape[0]}, expected {embs.shape[1]}")
-            embs = np.vstack([embs, emb.reshape(1, -1)])
-        labels.append(label)
-        self.save(embs, labels)
+            new_embs = np.vstack([embs, emb.reshape(1, -1)])
+            index = len(embs)  # New index
+        
+        # Save
+        np.save(self.emb_path, new_embs)
+        
+        return index
+
 
 
 # =========================
