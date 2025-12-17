@@ -24,13 +24,6 @@ Table face_embeddings {
   Note: 'External file: face_db/embeddings.npy'
 }
 
-Table face_labels {
-  index integer [primary key, note: 'Array index (stored in .json file)']
-  label varchar [note: 'Format: NamaOrtu_NamaAnak_Kelas']
-  
-  Note: 'External file: face_db/labels.json'
-}
-
 Table qr_codes {
   filename varchar [primary key, note: 'NIS_NamaOrtu.png']
   nis varchar [note: 'Link ke students']
@@ -42,5 +35,4 @@ Table qr_codes {
 // Relationships
 Ref: parents.nis > students.nis // many-to-one (multiple parents per student)
 Ref: parents.embedding_index - face_embeddings.index // one-to-one
-Ref: parents.embedding_index - face_labels.index // one-to-one
 Ref: qr_codes.nis > students.nis // many-to-one (multiple QR per student)
