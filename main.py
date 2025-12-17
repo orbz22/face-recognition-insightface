@@ -314,14 +314,10 @@ def main():
             input("Tekan ENTER untuk mulai...")
             
             try:
-                # Get current embedding count (untuk index)
-                embs, labels = db.load()
-                embedding_index = embs.shape[0]  # Next index
-                
-                # Enroll face (using temporary label)
+                # Enroll face (returns embedding index)
                 temp_label = f"{parent_name}_{student['nama']}_{student['kelas']}"
                 
-                enroll_mode(
+                embedding_index = enroll_mode(
                     app=app,
                     db=db,
                     name=temp_label,
@@ -332,6 +328,11 @@ def main():
                     min_det_score=MIN_DET_SCORE,
                     save_snapshots=True
                 )
+                
+                # Check if enrollment succeeded
+                if embedding_index is None:
+                    print("\n[X] Enrollment gagal atau dibatalkan.")
+                    continue
                 
                 # Save to student database
                 student_db.add_parent(nis, parent_name, embedding_index)

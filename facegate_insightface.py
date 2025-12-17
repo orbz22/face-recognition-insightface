@@ -316,9 +316,13 @@ def enroll_mode(app: FaceAnalysis,
     avg_emb = l2_normalize(avg_emb)
 
 
-    db.add(avg_emb, name)
+    # Add to FaceDB and get index
+    index = db.add(avg_emb)
     logger.log_enrollment(name, len(collected), success=True, camera_index=cam_index)
     print(f"\n✅ Enroll selesai. '{name}' ditambahkan ke database ({db.db_dir}).")
+    print(f"   Embedding index: {index}")
+    
+    return index  # Return index for database save
 
 
 
@@ -335,19 +339,20 @@ def recognize_mode(app: FaceAnalysis,
     - ambil embedding wajah terbesar
     - hitung cosine similarity ke semua embedding di DB
     - jika sim >= threshold => dikenal
+    - lookup database untuk get student info
     Catatan:
     - threshold perlu dikalibrasi (0.3 - 0.5 tergantung model & kondisi).
     """
-    embs, labels = db.load()
+    embs = db.load()
     
     # Check if database is empty or invalid
-    if embs is None or labels is None:
-        print(f"DB error. Tidak bisa load database. (folder: {db.db_dir})")
-        return
-    
-    if embs.shape[0] == 0:
+    if embs is None or len(embs) == 0:
         print(f"DB kosong. Jalankan enroll dulu. (folder: {db.db_dir})")
         return
+    
+    # Load student database
+    from student_database import StudentDatabase
+    student_db = StudentDatabase("students.db")
 
     cap = open_camera(cam_index, width, height)
     print("\n[RECOGNIZE]")
@@ -439,9 +444,19 @@ def recognize_mode(app: FaceAnalysis,
                         best_sim = float(sims[best_idx])
 
                         if best_sim >= threshold:
-                            name = labels[best_idx]
-                            recognized_faces.append((face, f"{name} | sim={best_sim:.2f}", True))
-                            logger.log_recognition(name, best_sim, cam_index, threshold)
+                            # Lookup database by embedding index
+                            parent = student_db.get_parent_by_index(best_idx)
+                            
+                            if parent:
+                                # Format: "Ortu: [Nama] | Anak: [Nama] ([Kelas])"
+                                name = f"Ortu: {parent['nama_ortu']} | Anak: {parent['nama_anak']} ({parent['kelas']})"
+                                recognized_faces.append((face, f"{name} | sim={best_sim:.2f}", True))
+                                logger.log_recognition(parent['nama_ortu'], best_sim, cam_index, threshold)
+                            else:
+                                # Index found but no database entry (data mismatch)
+                                name = f"Index:{best_idx} (No DB entry)"
+                                recognized_faces.append((face, f"{name} | sim={best_sim:.2f}", False))
+                                logger.log_recognition(None, best_sim, cam_index, threshold)
                         else:
                             recognized_faces.append((face, f"Unknown | sim={best_sim:.2f}", False))
                             logger.log_recognition(None, best_sim, cam_index, threshold)
