@@ -68,13 +68,14 @@ Entitas **qr_codes** merepresentasikan QR codes yang di-generate untuk setiap en
 
 | Atribut | Tipe Data | Keterangan |
 |---------|-----------|------------|
-| filename | VARCHAR (PRIMARY KEY) | Nama file (format: NIS_NamaOrtu.png) |
-| nis | VARCHAR | NIS siswa (link ke students) |
+| nis | VARCHAR (PRIMARY KEY) | NIS siswa (format filename: NIS.png) |
 | qr_content | VARCHAR | Konten QR (format: hash:nis) |
 
 **Storage:** File `qr_codes/*.png`
 
 **Fungsi:** Menyediakan metode verifikasi backup menggunakan QR code yang berisi NIS terenkripsi.
+
+**Catatan:** Satu QR code per siswa (bukan per orang tua). Semua orang tua dari siswa yang sama menggunakan QR code yang sama.
 
 ## 3.X.3 Relasi Antar Entitas
 
@@ -104,11 +105,17 @@ Entitas **qr_codes** merepresentasikan QR codes yang di-generate untuk setiap en
 
 ### 3.X.3.3 Relasi Students - QR Codes
 
-**Jenis Relasi:** One-to-Many (1:N)
+**Jenis Relasi:** One-to-One (1:1)
 
-**Penjelasan:** Satu siswa dapat memiliki beberapa QR codes (satu untuk setiap orang tua yang terdaftar), namun setiap QR code hanya terhubung ke satu siswa.
+**Penjelasan:** Setiap siswa memiliki tepat satu QR code, dan setiap QR code hanya terhubung ke satu siswa. QR code ini dapat digunakan oleh semua orang tua dari siswa tersebut.
 
-**Implementasi:** Kolom `nis` pada QR code filename yang mereferensi NIS siswa.
+**Implementasi:** Kolom `nis` pada tabel qr_codes yang mereferensi primary key `nis` pada tabel students.
+
+**Karakteristik:**
+- Primary key pada qr_codes.nis memastikan hanya satu QR per siswa
+- Filename format: `{NIS}.png` (contoh: `111.png`)
+- QR code di-generate pada enrollment pertama untuk siswa tersebut
+- Enrollment berikutnya untuk siswa yang sama menggunakan QR yang sudah ada
 
 ## 3.X.4 Diagram ERD
 
@@ -125,15 +132,16 @@ Berikut adalah Entity Relationship Diagram sistem face recognition:
 └─────────────────────┘         │
                                 │
                                 │ N
-                    ┌───────────┴──────────┐
-                    │                      │
-        ┌───────────▼────────┐    ┌────────▼──────────┐
-        │      parents       │    │    qr_codes       │
-        │────────────────────│    │───────────────────│
-        │ id (PK)            │    │ filename (PK)     │
-        │ nis (FK)           │    │ nis               │
-        │ nama_ortu          │    │ qr_content        │
-        │ embedding_index    │    └───────────────────┘
+                    ┌───────────┴──────────────────┐
+                    │                              │
+                    │ N                            │ 1:1
+        ┌───────────▼────────┐        ┌────────────▼──────┐
+        │      parents       │        │    qr_codes       │
+        │────────────────────│        │───────────────────│
+        │ id (PK)            │        │ nis (PK)          │
+        │ nis (FK)           │        │ qr_content        │
+        │ nama_ortu          │        └───────────────────┘
+        │ embedding_index    │
         │ enrolled_at        │
         └────────┬───────────┘
                  │
@@ -162,7 +170,7 @@ Berikut adalah Entity Relationship Diagram sistem face recognition:
    - Capture wajah → Extract embedding (512-D vector)
    - Simpan embedding ke **face_embeddings** (embeddings.npy) → dapat index
    - Simpan data orang tua ke tabel **parents** dengan embedding_index
-   - Generate QR code dengan NIS terenkripsi → simpan ke **qr_codes**
+   - Generate QR code dengan NIS terenkripsi → simpan ke **qr_codes** (hanya jika belum ada)
 
 ### 3.X.5.2 Alur Recognition
 
@@ -206,7 +214,7 @@ Database sistem ini telah menerapkan normalisasi hingga **Third Normal Form (3NF
 
 ### 3.X.7.1 Entity Integrity
 - Setiap tabel memiliki primary key yang unik dan not null
-- Primary key: students.nis, parents.id, face_embeddings.index, qr_codes.filename
+- Primary key: students.nis, parents.id, face_embeddings.index, qr_codes.nis
 
 ### 3.X.7.2 Referential Integrity
 - Foreign key parents.nis → students.nis dengan constraint CASCADE
