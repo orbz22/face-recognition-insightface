@@ -25,8 +25,7 @@ Table face_embeddings {
 }
 
 Table qr_codes {
-  filename varchar [primary key, note: 'NIS_NamaOrtu.png']
-  nis varchar [note: 'Link ke students']
+  nis varchar [primary key, note: 'NIS.png (one QR per student)']
   qr_content varchar [note: 'Format: hash:nis']
   
   Note: 'External files: qr_codes/*.png'
@@ -35,4 +34,4 @@ Table qr_codes {
 // Relationships
 Ref: parents.nis > students.nis // many-to-one (multiple parents per student)
 Ref: parents.embedding_index - face_embeddings.index // one-to-one
-Ref: qr_codes.nis > students.nis // many-to-one (multiple QR per student)
+Ref: qr_codes.nis - students.nis // one-to-one (one QR per student)
