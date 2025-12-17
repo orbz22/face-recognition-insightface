@@ -149,15 +149,33 @@ def qr_code_menu(cam_index: int):
         choice = input("\nPilih (1-3): ").strip()
         
         if choice == "1":
-            # Generate QR codes
+            # Generate QR codes for all enrolled parents
             print("\n[*] Generating QR Codes...")
-            count = qr_manager.generate_qr_for_all()
+            
+            from student_database import StudentDatabase
+            student_db = StudentDatabase("students.db")
+            
+            parents = student_db.list_all_parents()
+            
+            if not parents:
+                print("\n[!] Belum ada orang tua yang terdaftar.")
+                print("    Silakan enroll wajah terlebih dahulu (Menu 1).")
+                input("\nTekan ENTER untuk kembali...")
+                continue
+            
+            count = 0
+            for parent in parents:
+                success = qr_manager.generate_qr_code(parent['nis'], parent['nama_ortu'], silent=False)
+                if success:
+                    count += 1
             
             if count > 0:
                 print(f"\n[OK] {count} QR codes telah di-generate!")
                 print(f"     Lokasi: qr_codes/")
                 print("\n[!] QR codes ini bisa dicetak dan diberikan ke orang tua")
                 print("    sebagai backup jika face recognition gagal.")
+            else:
+                print("\n[!] Tidak ada QR code yang berhasil di-generate.")
             
             input("\nTekan ENTER untuk kembali...")
         
@@ -168,24 +186,33 @@ def qr_code_menu(cam_index: int):
             
             if result:
                 print(f"\n[OK] QR Code berhasil di-scan!")
-                print(f"     Label: {result['label']}")
                 
-                # Parse label
-                parts = result['label'].split('_')
-                if len(parts) >= 3:
-                    print(f"     Nama Ortu: {parts[0]}")
-                    print(f"     Nama Anak: {parts[1]}")
-                    print(f"     Kelas: {parts[2]}")
+                # Get NIS from QR
+                nis = result.get('nis')
                 
-                # Verify
-                if qr_manager.verify_qr_data(result):
-                    print(f"     Status: VALID ✓")
-                    logger.log_access(result['label'], granted=True, reason="QR Code scan")
+                if nis:
+                    # Lookup student from database
+                    from student_database import StudentDatabase
+                    student_db = StudentDatabase("students.db")
+                    
+                    parent = student_db.get_parent_by_nis(nis)
+                    
+                    if parent:
+                        print(f"     NIS: {parent['nis']}")
+                        print(f"     Nama Ortu: {parent['nama_ortu']}")
+                        print(f"     Nama Anak: {parent['nama_anak']}")
+                        print(f"     Kelas: {parent['kelas']}")
+                        print(f"\n[OK] Verifikasi berhasil!")
+                        logger.log_access(f"NIS:{nis}", granted=True, reason="QR Code scan")
+                    else:
+                        print(f"     NIS: {nis}")
+                        print(f"\n[X] Data tidak ditemukan di database!")
+                        logger.log_access(f"NIS:{nis}", granted=False, reason="QR Code scan - Data not found")
                 else:
-                    print(f"     Status: INVALID ✗")
-                    logger.log_access(result['label'], granted=False, reason="Invalid QR Code")
+                    print(f"\n[X] QR code tidak valid!")
+                    logger.log_access("Invalid QR", granted=False, reason="QR Code scan - Invalid format")
             else:
-                print("\n[!] Tidak ada QR code yang ter-scan.")
+                print(f"\n[!] Tidak ada QR code yang ter-scan.")
             
             input("\nTekan ENTER untuk kembali...")
         
