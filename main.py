@@ -149,7 +149,7 @@ def qr_code_menu(cam_index: int):
         choice = input("\nPilih (1-3): ").strip()
         
         if choice == "1":
-            # Generate QR codes for all enrolled parents
+            # Generate QR codes for all students with enrolled parents
             print("\n[*] Generating QR Codes...")
             
             from student_database import StudentDatabase
@@ -163,19 +163,27 @@ def qr_code_menu(cam_index: int):
                 input("\nTekan ENTER untuk kembali...")
                 continue
             
+            # Get unique NIS (one QR per student, not per parent)
+            unique_nis = list(set([p['nis'] for p in parents]))
+            
             count = 0
-            for parent in parents:
-                success = qr_manager.generate_qr_code(parent['nis'], parent['nama_ortu'], silent=False)
-                if success:
-                    count += 1
+            for nis in unique_nis:
+                qr_path = os.path.join("qr_codes", f"{nis}.png")
+                if not os.path.exists(qr_path):
+                    success = qr_manager.generate_qr_code(nis, silent=False)
+                    if success:
+                        count += 1
+                else:
+                    print(f"[!] QR already exists: {nis}.png (skipped)")
             
             if count > 0:
                 print(f"\n[OK] {count} QR codes telah di-generate!")
                 print(f"     Lokasi: qr_codes/")
-                print("\n[!] QR codes ini bisa dicetak dan diberikan ke orang tua")
-                print("    sebagai backup jika face recognition gagal.")
+                print(f"     Total students: {len(unique_nis)}")
+                print("\n[!] Satu QR code per siswa.")
+                print("    QR ini bisa digunakan oleh semua orang tua siswa tersebut.")
             else:
-                print("\n[!] Tidak ada QR code yang berhasil di-generate.")
+                print(f"\n[!] Semua QR code sudah ada ({len(unique_nis)} students).")
             
             input("\nTekan ENTER untuk kembali...")
         
@@ -338,10 +346,19 @@ def main():
                 student_db.add_parent(nis, parent_name, embedding_index)
                 print(f"\n[OK] Data orang tua disimpan ke database!")
                 
-                # Generate QR code with NIS
+                # Generate QR code with NIS (only once per student)
                 if QR_AVAILABLE:
                     try:
-                        qr_manager.generate_qr_code(nis, parent_name, silent=False)
+                        qr_path = os.path.join("qr_codes", f"{nis}.png")
+                        if not os.path.exists(qr_path):
+                            # Generate QR (first enrollment for this student)
+                            qr_manager.generate_qr_code(nis, silent=False)
+                            print(f"\n[OK] QR code untuk siswa ini telah di-generate.")
+                            print(f"     File: {nis}.png")
+                            print(f"     QR ini bisa digunakan oleh semua orang tua siswa ini.")
+                        else:
+                            print(f"\n[!] QR code sudah ada: {nis}.png")
+                            print(f"     QR ini bisa digunakan oleh semua orang tua siswa ini.")
                     except Exception as e:
                         print(f"[!] QR generation error: {e}")
                 

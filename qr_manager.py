@@ -110,13 +110,13 @@ class QRCodeManager:
         
         return count
     
-    def generate_qr_code(self, nis: str, nama_ortu: str = None, silent: bool = False) -> bool:
+    
+    def generate_qr_code(self, nis: str, silent: bool = False) -> bool:
         """
-        Generate QR code untuk satu orang (berdasarkan NIS)
+        Generate QR code untuk satu siswa (1 QR per student)
         
         Args:
             nis: NIS siswa
-            nama_ortu: Nama orang tua (optional, untuk filename)
             silent: Jika True, tidak print message
         
         Returns:
@@ -135,7 +135,6 @@ class QRCodeManager:
             hash_obj = hashlib.sha256(combined.encode())
             qr_data = hash_obj.hexdigest()  # 64 characters (vs 100+ with Fernet)
             
-            # Also store mapping for verification
             # Format: hash:nis
             qr_content = f"{qr_data[:16]}:{nis}"  # Use first 16 chars of hash + NIS
             
@@ -152,13 +151,8 @@ class QRCodeManager:
             # Create image dengan ukuran besar
             img = qr.make_image(fill_color="black", back_color="white")
             
-            # Filename: NIS_NamaOrtu.png or just NIS.png
-            if nama_ortu:
-                # Sanitize nama_ortu for filename
-                safe_name = nama_ortu.replace(" ", "_").replace("/", "_")
-                filename = f"{nis}_{safe_name}.png"
-            else:
-                filename = f"{nis}.png"
+            # Filename: NIS.png (simple, one per student)
+            filename = f"{nis}.png"
             
             filepath = os.path.join(self.qr_dir, filename)
             img.save(filepath)
@@ -166,8 +160,6 @@ class QRCodeManager:
             if not silent:
                 print(f"[OK] QR code generated: {filename}")
                 print(f"     NIS: {nis}")
-                if nama_ortu:
-                    print(f"     Ortu: {nama_ortu}")
                 print(f"     Data: Hash + NIS ({len(qr_content)} chars)")
             
             return True
