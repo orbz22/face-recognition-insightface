@@ -120,21 +120,21 @@ class QRCodeManager:
             True jika berhasil
         """
         try:
-            # SIMPLIFIED: Encrypt NIS saja
-            # QR code berisi encrypted NIS
-            encrypted = self.encrypt_data(nis)
+            # ULTRA SIMPLIFIED: Plain NIS (no encryption)
+            # Untuk QR code yang lebih sederhana dan mudah di-scan
+            qr_data = nis  # Just NIS, no encryption!
             
-            # Generate QR code dengan setting untuk kamera low-res
+            # Generate QR code dengan setting OPTIMAL untuk kamera low-res
             qr = qrcode.QRCode(
-                version=1,  # Versi terkecil
-                error_correction=qrcode.constants.ERROR_CORRECT_L,  # Low error correction (lebih simple)
-                box_size=20,  # DIPERBESAR dari 10 ke 20 (kotak lebih besar)
-                border=2,     # Border dikurangi dari 4 ke 2
+                version=1,  # Versi terkecil (21x21 modules)
+                error_correction=qrcode.constants.ERROR_CORRECT_L,  # Low = paling simple
+                box_size=30,  # DIPERBESAR lagi untuk scan lebih mudah
+                border=2,     # Border minimal
             )
-            qr.add_data(encrypted)
+            qr.add_data(qr_data)
             qr.make(fit=True)
             
-            # Create image
+            # Create image dengan ukuran besar
             img = qr.make_image(fill_color="black", back_color="white")
             
             # Filename: NIS_NamaOrtu.png or just NIS.png
@@ -153,6 +153,7 @@ class QRCodeManager:
                 print(f"     NIS: {nis}")
                 if nama_ortu:
                     print(f"     Ortu: {nama_ortu}")
+                print(f"     Data: Plain NIS (no encryption)")
             
             return True
             
@@ -196,42 +197,35 @@ class QRCodeManager:
             decoded_objects = decode(frame)
             
             for obj in decoded_objects:
-                # Get encrypted data
-                encrypted_data = obj.data.decode('utf-8')
+                # Get QR data (plain NIS, no encryption)
+                qr_data = obj.data.decode('utf-8')
                 
-                # Decrypt
-                decrypted = self.decrypt_data(encrypted_data)
-                
-                if decrypted:
-                    try:
-                        # QR code berisi NIS (encrypted)
-                        nis = decrypted.strip()
-                        
-                        # Return NIS
-                        data = {
-                            'nis': nis,
-                            'raw_data': encrypted_data # Use encrypted_data as raw_data
-                        }
-                        
-                        # Draw rectangle around QR code
-                        points = obj.polygon
-                        if len(points) == 4:
-                            pts = [(point.x, point.y) for point in points]
-                            cv2.polylines(frame, [np.array(pts, dtype=np.int32)], True, (0, 255, 0), 3)
-                        
-                        # Display info
-                        cv2.putText(frame, "QR Code Detected!", (10, 30),
-                                   cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-                        cv2.putText(frame, f"NIS: {data['nis']}", (10, 60),
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-                        
-                        result = data
-                        
-                    except Exception as e:
-                        cv2.putText(frame, "Invalid QR Code", (10, 30),
-                                   cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                else:
-                    cv2.putText(frame, "Decryption Failed", (10, 30),
+                try:
+                    # QR code berisi plain NIS
+                    nis = qr_data.strip()
+                    
+                    # Return NIS
+                    data = {
+                        'nis': nis,
+                        'raw_data': qr_data
+                    }
+                    
+                    # Draw rectangle around QR code
+                    points = obj.polygon
+                    if len(points) == 4:
+                        pts = [(point.x, point.y) for point in points]
+                        cv2.polylines(frame, [np.array(pts, dtype=np.int32)], True, (0, 255, 0), 3)
+                    
+                    # Display info
+                    cv2.putText(frame, "QR Code Detected!", (10, 30),
+                               cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                    cv2.putText(frame, f"NIS: {data['nis']}", (10, 60),
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                    
+                    result = data
+                    
+                except Exception as e:
+                    cv2.putText(frame, "Invalid QR Code", (10, 30),
                                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
             
             # Display
