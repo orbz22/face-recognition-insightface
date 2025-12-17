@@ -120,18 +120,30 @@ class QRCodeManager:
             True jika berhasil
         """
         try:
-            # ULTRA SIMPLIFIED: Plain NIS (no encryption)
-            # Untuk QR code yang lebih sederhana dan mudah di-scan
-            qr_data = nis  # Just NIS, no encryption!
+            # OPTIMIZED: Use SHA256 hash (fixed 64 chars, much shorter than Fernet)
+            # Hash NIS with secret key for security
+            import hashlib
+            
+            # Combine NIS with secret key
+            secret = self.key.decode() if isinstance(self.key, bytes) else str(self.key)
+            combined = f"{nis}:{secret}"
+            
+            # Generate SHA256 hash (64 hex characters)
+            hash_obj = hashlib.sha256(combined.encode())
+            qr_data = hash_obj.hexdigest()  # 64 characters (vs 100+ with Fernet)
+            
+            # Also store mapping for verification
+            # Format: hash:nis
+            qr_content = f"{qr_data[:16]}:{nis}"  # Use first 16 chars of hash + NIS
             
             # Generate QR code dengan setting OPTIMAL untuk kamera low-res
             qr = qrcode.QRCode(
                 version=1,  # Versi terkecil (21x21 modules)
                 error_correction=qrcode.constants.ERROR_CORRECT_L,  # Low = paling simple
-                box_size=30,  # DIPERBESAR lagi untuk scan lebih mudah
+                box_size=30,  # Box besar untuk scan mudah
                 border=2,     # Border minimal
             )
-            qr.add_data(qr_data)
+            qr.add_data(qr_content)
             qr.make(fit=True)
             
             # Create image dengan ukuran besar
@@ -153,7 +165,7 @@ class QRCodeManager:
                 print(f"     NIS: {nis}")
                 if nama_ortu:
                     print(f"     Ortu: {nama_ortu}")
-                print(f"     Data: Plain NIS (no encryption)")
+                print(f"     Data: Hash + NIS ({len(qr_content)} chars)")
             
             return True
             
@@ -197,18 +209,42 @@ class QRCodeManager:
             decoded_objects = decode(frame)
             
             for obj in decoded_objects:
-                # Get QR data (plain NIS, no encryption)
+                # Get QR data (hash:nis format)
                 qr_data = obj.data.decode('utf-8')
                 
                 try:
-                    # QR code berisi plain NIS
-                    nis = qr_data.strip()
-                    
-                    # Return NIS
-                    data = {
-                        'nis': nis,
-                        'raw_data': qr_data
-                    }
+                    # QR format: hash:nis
+                    if ':' in qr_data:
+                        hash_part, nis = qr_data.split(':', 1)
+                        
+                        # Verify hash (optional - for extra security)
+                        import hashlib
+                        secret = self.key.decode() if isinstance(self.key, bytes) else str(self.key)
+                        combined = f"{nis}:{secret}"
+                        expected_hash = hashlib.sha256(combined.encode()).hexdigest()[:16]
+                        
+                        if hash_part == expected_hash:
+                            # Valid QR code
+                            data = {
+                                'nis': nis,
+                                'raw_data': qr_data,
+                                'verified': True
+                            }
+                        else:
+                            # Hash mismatch - possible tampering
+                            data = {
+                                'nis': nis,
+                                'raw_data': qr_data,
+                                'verified': False
+                            }
+                    else:
+                        # Old format (plain NIS) - still support
+                        nis = qr_data.strip()
+                        data = {
+                            'nis': nis,
+                            'raw_data': qr_data,
+                            'verified': False  # No hash to verify
+                        }
                     
                     # Draw rectangle around QR code
                     points = obj.polygon
