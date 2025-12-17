@@ -48,6 +48,9 @@ class QRCodeManager:
                 f.write(key)
             print(f"[*] Encryption key created: {self.key_file}")
         
+        # Store key for SHA256 hashing
+        self.key = key
+        
         return Fernet(key)
     
     def _generate_id(self, label: str, index: int) -> str:
