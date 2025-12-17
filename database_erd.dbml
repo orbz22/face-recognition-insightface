@@ -1,144 +1,46 @@
-// Face Recognition System - Entity Relationship Diagram
+// Face Recognition System - Database ERD
+// Copy and paste to: https://dbdiagram.io/
 // Database: students.db (SQLite)
-// Generated for: https://dbdiagram.io/
-
-// ============================================
-// TABLES
-// ============================================
 
 Table students {
-  nis varchar [pk, not null, note: 'Nomor Induk Siswa (Primary Key)']
+  nis varchar [primary key, note: 'Nomor Induk Siswa']
   nama varchar [not null, note: 'Nama lengkap siswa']
-  kelas varchar [not null, note: 'Kelas siswa (contoh: 1B, 3A)']
-  created_at timestamp [default: `CURRENT_TIMESTAMP`, note: 'Waktu pendaftaran siswa']
-  
-  Note: 'Data siswa - Master data untuk semua siswa di sekolah'
+  kelas varchar [not null, note: 'Kelas (contoh: 1B, 3A, TK-A)']
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
 }
 
 Table parents {
-  id integer [pk, increment, note: 'Auto-increment ID']
-  nis varchar [not null, ref: > students.nis, note: 'Foreign Key ke students']
+  id integer [primary key, increment]
+  nis varchar [not null, note: 'Link ke students']
   nama_ortu varchar [not null, note: 'Nama orang tua/wali']
-  embedding_index integer [not null, unique, note: 'Index di embeddings.npy (face data)']
-  enrolled_at timestamp [default: `CURRENT_TIMESTAMP`, note: 'Waktu enrollment wajah']
-  
-  Indexes {
-    nis [name: 'idx_parents_nis', note: 'Index untuk faster lookup by NIS']
-    embedding_index [name: 'idx_parents_embedding', note: 'Index untuk faster lookup by embedding']
-  }
-  
-  Note: 'Data orang tua yang sudah enroll wajah - Link ke face embeddings'
+  embedding_index integer [not null, unique, note: 'Index di embeddings.npy']
+  enrolled_at timestamp [default: `CURRENT_TIMESTAMP`]
 }
 
-// ============================================
-// EXTERNAL DATA (Not in SQLite)
-// ============================================
-
-Table face_embeddings [note: 'Stored in: face_db/embeddings.npy (NumPy array)'] {
-  index integer [pk, note: 'Array index (0, 1, 2, ...)']
-  embedding float_array [note: '512-dimensional face embedding vector']
+Table face_embeddings {
+  index integer [primary key, note: 'Array index (stored in .npy file)']
+  embedding varchar [note: '512-D vector (NumPy array)']
   
-  Note: 'Face embeddings - NumPy array (N x 512) stored as .npy file'
+  Note: 'External file: face_db/embeddings.npy'
 }
 
-Table face_labels [note: 'Stored in: face_db/labels.json'] {
-  index integer [pk, note: 'Array index matching embeddings.npy']
+Table face_labels {
+  index integer [primary key, note: 'Array index (stored in .json file)']
   label varchar [note: 'Format: NamaOrtu_NamaAnak_Kelas']
   
-  Note: 'Face labels - JSON array matching embeddings.npy indices'
+  Note: 'External file: face_db/labels.json'
 }
 
-Table qr_codes [note: 'Stored in: qr_codes/*.png'] {
-  filename varchar [pk, note: 'Format: NIS_NamaOrtu.png']
-  nis varchar [note: 'NIS siswa (links to students)']
-  qr_content varchar [note: 'Format: hash:nis (SHA256 hash + NIS)']
+Table qr_codes {
+  filename varchar [primary key, note: 'NIS_NamaOrtu.png']
+  nis varchar [note: 'Link ke students']
+  qr_content varchar [note: 'Format: hash:nis']
   
-  Note: 'QR codes - PNG files for backup verification'
+  Note: 'External files: qr_codes/*.png'
 }
 
-// ============================================
-// RELATIONSHIPS
-// ============================================
-
-Ref: parents.nis > students.nis [
-  delete: cascade,
-  update: cascade,
-  note: 'One student can have multiple parents enrolled'
-]
-
-Ref: parents.embedding_index - face_embeddings.index [
-  note: 'One-to-one: Each parent enrollment has one face embedding'
-]
-
-Ref: parents.embedding_index - face_labels.index [
-  note: 'One-to-one: Each parent has one label entry'
-]
-
-Ref: students.nis < qr_codes.nis [
-  note: 'One student can have multiple QR codes (one per parent)'
-]
-
-// ============================================
-// ENUMS (Optional - for documentation)
-// ============================================
-
-Enum kelas_enum {
-  "1A"
-  "1B"
-  "1C"
-  "2A"
-  "2B"
-  "2C"
-  "3A"
-  "3B"
-  "3C"
-  "TK-A"
-  "TK-B"
-  [note: 'Common class values - not enforced in SQLite']
-}
-
-// ============================================
-// NOTES
-// ============================================
-
-Note system_architecture {
-  '''
-  # Face Recognition System Architecture
-  
-  ## Database Structure:
-  1. **students** - Master data siswa (NIS, nama, kelas)
-  2. **parents** - Data orang tua yang sudah enroll wajah
-  
-  ## External Data:
-  3. **embeddings.npy** - Face embeddings (512-D vectors)
-  4. **labels.json** - Labels matching embeddings
-  5. **qr_codes/*.png** - QR codes untuk backup verification
-  
-  ## Key Relationships:
-  - students (1) → (N) parents: One student, multiple parents
-  - parents (1) → (1) embeddings: One parent, one face embedding
-  - parents (1) → (1) labels: One parent, one label
-  - students (1) → (N) qr_codes: One student, multiple QR codes
-  
-  ## Workflow:
-  1. Add student to `students` table
-  2. Enroll parent face → Create entry in `parents`
-  3. Face embedding saved to `embeddings.npy` at index
-  4. Label saved to `labels.json` at same index
-  5. QR code generated with NIS → Saved as PNG file
-  
-  ## Recognition Flow:
-  1. Detect face → Extract embedding
-  2. Match with `embeddings.npy` → Get index
-  3. Lookup `parents` by embedding_index
-  4. Get NIS → Lookup `students` for student info
-  5. Display: Parent name + Student name + Class
-  
-  ## QR Code Flow:
-  1. Scan QR → Get hash:nis
-  2. Verify hash (SHA256)
-  3. Lookup `students` by NIS
-  4. Lookup `parents` by NIS
-  5. Display: Parent + Student info
-  '''
-}
+// Relationships
+Ref: parents.nis > students.nis // many-to-one (multiple parents per student)
+Ref: parents.embedding_index - face_embeddings.index // one-to-one
+Ref: parents.embedding_index - face_labels.index // one-to-one
+Ref: qr_codes.nis > students.nis // many-to-one (multiple QR per student)
