@@ -328,28 +328,11 @@ def enroll_mode(app: FaceAnalysis,
     avg_emb = np.mean(np.stack(collected, axis=0), axis=0)
     avg_emb = l2_normalize(avg_emb)
 
+
     db.add(avg_emb, name)
     logger.log_enrollment(name, len(collected), success=True, camera_index=cam_index)
     print(f"\n✅ Enroll selesai. '{name}' ditambahkan ke database ({db.db_dir}).")
-    
-    # AUTO-GENERATE QR CODE
-    try:
-        from qr_manager import QRCodeManager
-        qr_manager = QRCodeManager(db_dir=db.db_dir)
-        
-        # Get index (last added)
-        index = len(db.load()[1]) - 1
-        
-        print(f"\n[*] Generating QR code...")
-        success = qr_manager.generate_qr_code(name, index, silent=True)
-        
-        if success:
-            print(f"✅ QR code generated: qr_codes/{name}.png")
-            print(f"   Cetak dan berikan QR code ini ke orang tua sebagai backup.")
-        else:
-            print(f"⚠️  QR code generation failed (enrollment tetap berhasil)")
-    except Exception as e:
-        print(f"⚠️  QR code generation error: {e} (enrollment tetap berhasil)")
+
 
 
 def recognize_mode(app: FaceAnalysis,
