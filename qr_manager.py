@@ -107,25 +107,22 @@ class QRCodeManager:
         
         return count
     
-    def generate_qr_code(self, label: str, index: int, silent: bool = False) -> bool:
+    def generate_qr_code(self, nis: str, nama_ortu: str = None, silent: bool = False) -> bool:
         """
-        Generate QR code untuk satu orang
+        Generate QR code untuk satu orang (berdasarkan NIS)
         
         Args:
-            label: Label dari database (NamaOrtu_NamaAnak_Kelas)
-            index: Index di database
+            nis: NIS siswa
+            nama_ortu: Nama orang tua (optional, untuk filename)
             silent: Jika True, tidak print message
         
         Returns:
             True jika berhasil
         """
         try:
-            # SIMPLIFIED: Hanya simpan index (lebih kecil, lebih mudah di-scan)
-            # Data minimal untuk QR code yang lebih sederhana
-            data = str(index)  # Hanya index saja!
-            
-            # Encrypt (data sudah minimal)
-            encrypted = self.encrypt_data(data)
+            # SIMPLIFIED: Encrypt NIS saja
+            # QR code berisi encrypted NIS
+            encrypted = self.encrypt_data(nis)
             
             # Generate QR code dengan setting untuk kamera low-res
             qr = qrcode.QRCode(
@@ -140,20 +137,28 @@ class QRCodeManager:
             # Create image
             img = qr.make_image(fill_color="black", back_color="white")
             
-            # Save dengan nama yang aman
-            safe_filename = label.replace('/', '_').replace('\\', '_')
-            filename = f"{safe_filename}.png"
-            filepath = os.path.join(self.qr_dir, filename)
+            # Filename: NIS_NamaOrtu.png or just NIS.png
+            if nama_ortu:
+                # Sanitize nama_ortu for filename
+                safe_name = nama_ortu.replace(" ", "_").replace("/", "_")
+                filename = f"{nis}_{safe_name}.png"
+            else:
+                filename = f"{nis}.png"
             
+            filepath = os.path.join(self.qr_dir, filename)
             img.save(filepath)
             
             if not silent:
-                print(f"  [OK] {label} -> {filename}")  # Changed arrow to ASCII
+                print(f"[OK] QR code generated: {filename}")
+                print(f"     NIS: {nis}")
+                if nama_ortu:
+                    print(f"     Ortu: {nama_ortu}")
+            
             return True
             
         except Exception as e:
             if not silent:
-                print(f"  [X] Error generating QR for {label}: {e}")
+                print(f"[X] Error generating QR code for NIS {nis}: {e}")
             return False
     
     def scan_qr_from_camera(self, cam_index: int = 0, width: int = 640, height: int = 480) -> Optional[Dict]:
@@ -199,43 +204,30 @@ class QRCodeManager:
                 
                 if decrypted:
                     try:
-                        # Data sekarang hanya index (string)
-                        index = int(decrypted)
+                        # QR code berisi NIS (encrypted)
+                        nis = decrypted.strip()
                         
-                        # Load labels untuk get label dari index
-                        label_path = os.path.join(self.db_dir, "labels.json")
-                        if os.path.exists(label_path):
-                            with open(label_path, 'r', encoding='utf-8') as f:
-                                labels = json.load(f)
-                            
-                            if index < len(labels):
-                                label = labels[index]
-                                
-                                # Prepare result
-                                data = {
-                                    'index': index,
-                                    'label': label,
-                                    'id': self._generate_id(label, index)
-                                }
-                                
-                                # Draw rectangle around QR code
-                                points = obj.polygon
-                                if len(points) == 4:
-                                    pts = [(point.x, point.y) for point in points]
-                                    cv2.polylines(frame, [np.array(pts, dtype=np.int32)], True, (0, 255, 0), 3)
-                                
-                                # Display info
-                                cv2.putText(frame, "QR Code Detected!", (10, 30),
-                                           cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-                                cv2.putText(frame, f"Label: {data['label']}", (10, 60),
-                                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-                                
-                                result = data
-                            else:
-                                cv2.putText(frame, "Invalid Index", (10, 30),
-                                           cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                        # Return NIS
+                        data = {
+                            'nis': nis,
+                            'raw_data': encrypted_data # Use encrypted_data as raw_data
+                        }
                         
-                    except (json.JSONDecodeError, ValueError):
+                        # Draw rectangle around QR code
+                        points = obj.polygon
+                        if len(points) == 4:
+                            pts = [(point.x, point.y) for point in points]
+                            cv2.polylines(frame, [np.array(pts, dtype=np.int32)], True, (0, 255, 0), 3)
+                        
+                        # Display info
+                        cv2.putText(frame, "QR Code Detected!", (10, 30),
+                                   cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                        cv2.putText(frame, f"NIS: {data['nis']}", (10, 60),
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                        
+                        result = data
+                        
+                    except Exception as e:
                         cv2.putText(frame, "Invalid QR Code", (10, 30),
                                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
                 else:

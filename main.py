@@ -233,34 +233,43 @@ def main():
         choice = input(f"\nPilih menu (1-4): ").strip()
         
         if choice == "1":
-            # Enroll mode
+            # Enroll mode with NIS
             print("\n[*] ENROLLMENT - Pendaftaran Wajah Orang Tua")
             print("="*50)
             
-            # Input data lengkap
-            parent_name = input("Nama Orang Tua: ").strip()
+            # Input NIS
+            nis = input("NIS Siswa: ").strip()
+            if not nis:
+                print("[X] NIS tidak boleh kosong!")
+                continue
+            
+            # Lookup student dari database
+            from student_database import StudentDatabase
+            student_db = StudentDatabase("students.db")
+            
+            student = student_db.get_student(nis)
+            if not student:
+                print(f"[X] NIS '{nis}' tidak ditemukan di database!")
+                print("    Silakan hubungi admin untuk menambahkan data siswa.")
+                continue
+            
+            # Display student info
+            print(f"\n[*] Data Siswa Ditemukan:")
+            print(f"   NIS: {student['nis']}")
+            print(f"   Nama: {student['nama']}")
+            print(f"   Kelas: {student['kelas']}")
+            
+            # Input parent name
+            parent_name = input("\nNama Orang Tua: ").strip()
             if not parent_name:
                 print("[X] Nama orang tua tidak boleh kosong!")
                 continue
             
-            child_name = input("Nama Anak: ").strip()
-            if not child_name:
-                print("[X] Nama anak tidak boleh kosong!")
-                continue
-            
-            child_class = input("Kelas Anak (contoh: 3A, 5B): ").strip()
-            if not child_class:
-                print("[X] Kelas anak tidak boleh kosong!")
-                continue
-            
-            # Format: NamaOrtu_NamaAnak_Kelas
-            full_label = f"{parent_name}_{child_name}_{child_class}"
-            
+            # Confirm
             print(f"\n[*] Data yang akan didaftarkan:")
-            print(f"   Nama Orang Tua: {parent_name}")
-            print(f"   Nama Anak: {child_name}")
-            print(f"   Kelas: {child_class}")
-            print(f"   Label Database: {full_label}")
+            print(f"   Orang Tua: {parent_name}")
+            print(f"   Anak: {student['nama']} (NIS: {nis})")
+            print(f"   Kelas: {student['kelas']}")
             
             confirm = input("\nApakah data sudah benar? (y/n): ").strip().lower()
             if confirm != 'y':
@@ -268,20 +277,27 @@ def main():
                 continue
             
             print(f"\n[*] Mode Enroll untuk: {parent_name}")
-            print("   Instruksi:")
-            print("   - Arahkan wajah ke kamera")
-            print("   - Tekan 'c' untuk capture sample")
-            print("   - Tekan 'q' untuk selesai/batal")
-            print(f"   - Target: {SAMPLES} samples")
+            print(f"   Anak: {student['nama']} ({student['kelas']})")
+            print(f"   Instruksi:")
+            print(f"   - Posisikan wajah di depan kamera")
+            print(f"   - Tekan 'c' untuk capture (10x)")
+            print(f"   - Tekan 'q' untuk batal")
             print(f"   - Camera: {CAM_INDEX}\n")
             
             input("Tekan ENTER untuk mulai...")
             
             try:
+                # Get current embedding count (untuk index)
+                embs, labels = db.load()
+                embedding_index = embs.shape[0]  # Next index
+                
+                # Enroll face (using temporary label)
+                temp_label = f"{parent_name}_{student['nama']}_{student['kelas']}"
+                
                 enroll_mode(
                     app=app,
                     db=db,
-                    name=full_label,
+                    name=temp_label,
                     cam_index=CAM_INDEX,
                     width=WIDTH,
                     height=HEIGHT,
@@ -289,6 +305,18 @@ def main():
                     min_det_score=MIN_DET_SCORE,
                     save_snapshots=True
                 )
+                
+                # Save to student database
+                student_db.add_parent(nis, parent_name, embedding_index)
+                print(f"\n[OK] Data orang tua disimpan ke database!")
+                
+                # Generate QR code with NIS
+                if QR_AVAILABLE:
+                    try:
+                        qr_manager.generate_qr_code(nis, parent_name, silent=False)
+                    except Exception as e:
+                        print(f"[!] QR generation error: {e}")
+                
             except Exception as e:
                 print(f"\n[X] Error saat enrollment: {e}")
                 logger.log_error("EnrollmentError", str(e))
